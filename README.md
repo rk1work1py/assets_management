@@ -25,4 +25,6 @@ LINE Messaging API + Google Apps Script + Googleスプレッドシート + Gemin
 
 ## ステータス
 
-設計・指示書フェーズ完了。実装は `docs/03_implementation_plan.md` のフェーズ0から着手する。
+フェーズ0〜6のコード実装と静的・モック検証が完了。
+利用開始には `docs/02_setup_guide.md` に従ってLINE・Gemini・スプレッドシートを設定し、
+フェーズ7の実機テストを実施する。
