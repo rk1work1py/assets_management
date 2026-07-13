@@ -1,13 +1,33 @@
+const MAX_ALLOWED_USERS = 2;
+
 function doPost(e) {
   const output = ContentService.createTextOutput('OK');
-  const rawBody = e && e.postData ? e.postData.contents : '';
+  const rawEnvelope = e && e.postData ? e.postData.contents : '';
   try {
-    const signatureResult = verifyLineSignature_(rawBody, getLineSignature_(e));
-    if (signatureResult === false) { console.error('Invalid LINE signature'); return output; }
+    const rawBody = extractVerifiedLineBody_(rawEnvelope);
+    if (rawBody === null) { console.error('Invalid gateway authentication'); return output; }
     const body = JSON.parse(rawBody || '{"events":[]}');
     (body.events || []).forEach(handleLineEventSafely_);
   } catch (error) { console.error('Webhook error: ' + error.stack); }
   return output;
+}
+
+function extractVerifiedLineBody_(rawEnvelope) {
+  let envelope;
+  try { envelope = JSON.parse(rawEnvelope || '{}'); } catch (error) { return null; }
+  const expected = getScriptProperty_(SCRIPT_PROPERTY_KEYS.GATEWAY_SHARED_SECRET);
+  const provided = String(envelope.gatewayToken || '');
+  if (!constantTimeEqual_(provided, expected)) return null;
+  return typeof envelope.lineBody === 'string' ? envelope.lineBody : null;
+}
+
+function constantTimeEqual_(left, right) {
+  left = String(left || '');
+  right = String(right || '');
+  if (left.length !== right.length || left.length === 0) return false;
+  let mismatch = 0;
+  for (let i = 0; i < left.length; i += 1) mismatch |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  return mismatch === 0;
 }
 
 function doGet() {
@@ -39,7 +59,7 @@ function handleLineEvent_(event) {
   const userId = event.source && event.source.userId;
   if (!userId) return;
   if (event.type === 'follow') {
-    addAllowedUser_(userId);
+    if (!addAllowedUser_(userId)) { console.warn('Allowed user limit reached; ignored follow event'); return; }
     replyMessage(event.replyToken, '友だち追加ありがとうございます！\n' + buildHelpMessage_());
     return;
   }
@@ -78,10 +98,21 @@ function buildHelpMessage_() {
 }
 
 function isAllowedUser_(userId) {
-  return getSettingValues_(SETTING_KEYS.DELIVERY_USER_ID).map(String).indexOf(String(userId)) >= 0;
+  return getAllowedUserIds_().indexOf(String(userId)) >= 0;
+}
+
+function getAllowedUserIds_() {
+  return Array.from(new Set(getSettingValues_(SETTING_KEYS.DELIVERY_USER_ID).map(String))).slice(0, MAX_ALLOWED_USERS);
 }
 
 function addAllowedUser_(userId) {
-  if (isAllowedUser_(userId)) return;
-  getSheet_(SHEET_NAMES.SETTINGS).appendRow([SETTING_KEYS.DELIVERY_USER_ID, userId, '月次レポートの配信先']);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    const allowed = getAllowedUserIds_();
+    if (allowed.indexOf(String(userId)) >= 0) return true;
+    if (allowed.length >= 2) return false;
+    getSheet_(SHEET_NAMES.SETTINGS).appendRow([SETTING_KEYS.DELIVERY_USER_ID, userId, '月次レポートの配信先']);
+    return true;
+  } finally { lock.releaseLock(); }
 }
