@@ -10,14 +10,28 @@ function doPost(e) {
   return output;
 }
 
+function doGet() {
+  return ContentService.createTextOutput('LINE household asset management bot is running.');
+}
+
 function handleLineEventSafely_(event) {
   try { handleLineEvent_(event); }
   catch (error) {
     console.error('Event error: ' + error.stack);
     if (event.replyToken) {
-      try { replyMessage(event.replyToken, 'エラーが発生しました。もう一度試してください。'); } catch (replyError) { console.error(replyError.stack); }
+      try { replyMessage(event.replyToken, buildSafeErrorMessage_(error)); } catch (replyError) { console.error(replyError.stack); }
     }
   }
+}
+
+function buildSafeErrorMessage_(error) {
+  const message = String(error && error.message || error);
+  if (message.indexOf('GEMINI_API_KEY') >= 0) return '⚠️ Gemini APIキーが設定されていません。';
+  if (/Gemini API failed \(400\)/.test(message)) return '⚠️ Gemini APIのリクエストエラー（400）です。';
+  if (/Gemini API failed \(403\)/.test(message)) return '⚠️ Gemini APIキーの権限エラー（403）です。';
+  if (/Gemini API failed \(429\)/.test(message)) return '⚠️ Gemini APIの利用上限（429）です。少し待って再試行してください。';
+  if (message.indexOf('LINE content API') >= 0) return '⚠️ LINEから画像を取得できませんでした。';
+  return 'エラーが発生しました。もう一度試してください。';
 }
 
 function handleLineEvent_(event) {
