@@ -5,7 +5,7 @@ LINEに「ランチ 850」と送る、またはレシート写真を送るだけ
 
 ## 構成
 
-LINE Messaging API + Google Apps Script + Googleスプレッドシート + Gemini API(レシート解析)。
+LINE Messaging API + Cloudflare Workers(署名検証) + Google Apps Script + Googleスプレッドシート + Gemini API(レシート解析)。
 すべて無料枠内で動作し、口座連携は行わない(資産は月次の手動スナップショット方式)。
 
 ## ドキュメント
@@ -15,6 +15,7 @@ LINE Messaging API + Google Apps Script + Googleスプレッドシート + Gemin
 | [docs/01_design.md](docs/01_design.md) | 設計書 — 要件、システム構成、データモデル、対話仕様、レシート解析仕様 |
 | [docs/02_setup_guide.md](docs/02_setup_guide.md) | 構築手順書 — LINE公式アカウント作成からWebhook接続までの手作業手順 |
 | [docs/03_implementation_plan.md](docs/03_implementation_plan.md) | 実装指示書 — フェーズ別の実装タスクと受け入れ条件 |
+| [docs/04_system_overview.md](docs/04_system_overview.md) | システム全体解説 — Cloudflareを含む仕組み、データフロー、セキュリティ、運用 |
 
 ## 主な機能
 
@@ -25,4 +26,6 @@ LINE Messaging API + Google Apps Script + Googleスプレッドシート + Gemin
 
 ## ステータス
 
-設計・指示書フェーズ完了。実装は `docs/03_implementation_plan.md` のフェーズ0から着手する。
+フェーズ0〜6のコード実装と静的・モック検証が完了。
+利用開始には `docs/02_setup_guide.md` に従ってLINE・Gemini・スプレッドシートを設定し、
+フェーズ7の実機テストを実施する。

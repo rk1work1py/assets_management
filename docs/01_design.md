@@ -29,6 +29,12 @@
                                        │ Webhook (POST)
                                        ▼
                             ┌─────────────────────┐
+                            │ Cloudflare Worker    │
+                            │ LINE署名検証・中継     │
+                            └──────────┬──────────┘
+                                       │ 共有鍵付きPOST
+                                       ▼
+                            ┌─────────────────────┐
                             │ Google Apps Script   │
                             │ (Webアプリとして公開)  │
                             │  - メッセージルーティング │
@@ -48,9 +54,10 @@
 | 要素 | 採用技術 | 料金 | 備考 |
 |------|---------|------|------|
 | 入力UI | LINE公式アカウント(コミュニケーションプラン) | 0円 | 応答メッセージは無料・無制限。プッシュは月200通まで無料(本設計の消費は月1〜2通/ユーザー) |
+| Webhookゲートウェイ | Cloudflare Workers Free | 0円 | `X-Line-Signature`を検証。無料枠は1日100,000リクエスト |
 | バックエンド | Google Apps Script(Webアプリ) | 0円 | サーバー不要。個人利用ならクォータに達しない |
 | データベース | Googleスプレッドシート | 0円 | データの直接閲覧・編集・グラフ化も兼ねる |
-| レシート解析 | Gemini API(`gemini-2.5-flash`系の無料枠) | 0円 | クレジットカード登録不要。無料枠はモデル改善に入力が使われる可能性がある点は了承済みとする |
+| レシート解析 | Gemini API(`gemini-3.5-flash`) | 利用枠に準拠 | 料金・無料枠・データ利用条件はGoogle AI Studioの最新表示を確認する |
 
 ## 3. データモデル(スプレッドシート定義)
 
@@ -121,7 +128,9 @@
 ### 機密情報の保存場所
 
 APIキー類はシートに書かず、GASの**スクリプトプロパティ**に保存する:
-`LINE_CHANNEL_ACCESS_TOKEN` / `LINE_CHANNEL_SECRET` / `GEMINI_API_KEY` / `SPREADSHEET_ID`
+`LINE_CHANNEL_ACCESS_TOKEN` / `GEMINI_API_KEY` / `SPREADSHEET_ID` / `GATEWAY_SHARED_SECRET`
+
+`LINE_CHANNEL_SECRET`はCloudflare Workerの暗号化Secretにのみ保存し、GASには置かない。
 
 ## 4. 対話仕様
 
@@ -166,7 +175,7 @@ APIキー類はシートに書かず、GASの**スクリプトプロパティ**�
 ### 5.1 処理フロー
 
 1. LINEの画像メッセージ受信 → Messaging APIのコンテンツ取得エンドポイントで画像バイナリを取得
-2. Gemini API(`gemini-2.5-flash` 系、`responseMimeType: application/json` + レスポンススキーマ指定)に画像+プロンプトを送信
+2. Gemini API(`gemini-3.5-flash`、`responseMimeType: application/json` + レスポンススキーマ指定)に画像+プロンプトを送信
 3. 返却JSONを検証し、確認メッセージを返信して確認待ち状態へ
 
 ### 5.2 抽出スキーマ
@@ -221,8 +230,9 @@ appsscript.json … タイムゾーン Asia/Tokyo、V8ランタイム
 
 ## 8. セキュリティ・プライバシー
 
-- GAS WebアプリはLINEのWebhookを受けるため「全員(匿名含む)」公開になる。そのため **`X-Line-Signature` の署名検証を必須**とし、検証失敗のリクエストは処理せず200のみ返す
-- さらに `設定`シートに登録済みのユーザーID以外からのメッセージは無視する(初回のみ友だち追加イベントで自動登録し、家族以外が友だち追加した場合はシートから手動削除できる)
+- Cloudflare Workerが生のリクエスト本文と`X-Line-Signature`をHMAC-SHA256で検証し、不正・署名なしのリクエストをGASへ転送しない
+- WorkerからGASへの転送は、両方のSecretに保存した256bit相当の共有鍵で追加認証する。GAS WebアプリURLへの直接POSTは共有鍵がないため処理されない
+- `設定`シートに登録済みのユーザーID以外からのメッセージは無視する。友だち追加による自動登録は最大2人までとし、上限到達後の追加を拒否する
 - APIキーはスクリプトプロパティのみに保存し、リポジトリ・シートには一切書かない
 - Gemini無料枠は入力がモデル改善に使われうる。レシート画像のみを送り、口座情報・資産額はGeminiに送らない設計とする(資産登録はテキストパースのみで完結)
 

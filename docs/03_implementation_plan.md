@@ -27,16 +27,20 @@
 
 **受け入れ条件**: `setup()` を2回実行しても、シート・初期データ・トリガーが重複しない。
 
-## フェーズ1: Webhook疎通と署名検証
+## フェーズ1: Webhook疎通と署名検証ゲートウェイ
 
 **成果物**: `main.gs`, `line.gs`
 
+- Cloudflare Worker:
+  - 生のWebhook本文と`X-Line-Signature`をchannel secretでHMAC-SHA256検証し、署名なし・不一致を401で拒否
+  - 検証済み本文を`GATEWAY_SHARED_SECRET`付きのJSON envelopeでGASへ転送。画像本体やWebhookを保存しない
 - `main.gs` の `doPost(e)`:
-  - `X-Line-Signature` を検証(`line.gs` に実装。channel secretでHMAC-SHA256、Base64比較)。GASのWebアプリはヘッダーを直接取得できないため、検証は署名がリクエストから取得可能な場合のみ行い、取得不能な環境では設計書8章のユーザーID許可リストを防御線とする。実装時にGASの制約を確認し、可能な検証を行うこと
+  - envelopeの共有鍵を定数時間比較し、不一致・欠落・直接POSTを処理しない
   - `events` 配列をループし、イベント種別で分岐: `message`(text/image) / `follow`
   - `follow` イベント: ユーザーIDを`設定`シートの配信先に自動追記し、あいさつ+ヘルプを返信
   - 未知のイベント・未対応メッセージ種別は無視して200
-- `line.gs`: `replyMessage(replyToken, texts)`, `pushMessage(userId, texts)`, `getMessageContent(messageId)`(画像取得)、署名検証
+- `line.gs`: `replyMessage(replyToken, texts)`, `pushMessage(userId, texts)`, `getMessageContent(messageId)`(画像取得には専用ホスト `api-data.line.me` を使用)
+- 許可ユーザーは最大2人。署名検証済みの`follow`イベントだけで登録し、3人目以降を拒否
 - この時点では、テキストが来たら同じ内容をエコー返信する仮実装でよい
 
 **受け入れ条件**: LINE Developersコンソールの「検証」が成功する。Botにテキストを送るとエコーが返る。友だち追加でユーザーIDが`設定`シートに記録される。
@@ -75,7 +79,7 @@
 - `state.gs`: `CacheService.getUserCache()` ではなくスクリプトキャッシュ+ユーザーIDキーで実装(`state:<userId>`、TTL 30分、値はJSON)
 - 画像メッセージ受信時:
   1. `getMessageContent` で画像取得
-  2. Gemini API呼び出し: モデルは `gemini-2.5-flash`(呼び出し失敗時は1回だけリトライ)。`responseMimeType: "application/json"` とレスポンススキーマで設計書5.2のJSONを強制。プロンプトは設計書5.3の方針(税込支払額、割引・預り金の注意、検算、カテゴリ一覧の埋め込み)を全て含める
+  2. Gemini API呼び出し: モデルは `gemini-3.5-flash`(呼び出し失敗時は1回だけリトライ)。`responseMimeType: "application/json"` とレスポンススキーマで設計書5.2のJSONを強制。プロンプトは設計書5.3の方針(税込支払額、割引・預り金の注意、検算、カテゴリ一覧の埋め込み)を全て含める
   3. 解析結果を保留として状態保存し、確認メッセージを返信。`confidence: low` なら ⚠️+warning を付ける
 - 確認待ち状態でのルーティング:
   - `OK`(`ok` `おけ` も許容)→ 確定登録(入力方法=`receipt`、日付はレシート日付、nullなら当日)
