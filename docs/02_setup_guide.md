@@ -47,12 +47,11 @@
 2. コードの配置は次のどちらかで行う:
    - **A. コピペ(簡単)**: このリポジトリの `src/` 配下の各 `.gs` ファイルを、GASエディタで同名のファイルを作って貼り付ける。`appsscript.json` はエディタの「プロジェクト設定」→「マニフェストを表示」を有効にして上書きする
    - **B. clasp(リポジトリと同期)**: ローカルで `npm i -g @google/clasp && clasp login && clasp clone <スクリプトID> --rootDir src` 後、`clasp push` で反映
-3. GASエディタの「プロジェクト設定」→「スクリプト プロパティ」に以下の4つを登録する:
+3. GASエディタの「プロジェクト設定」→「スクリプト プロパティ」に以下の3つを登録する:
 
 | プロパティ名 | 値 |
 |---|---|
 | `LINE_CHANNEL_ACCESS_TOKEN` | 手順1-5のチャネルアクセストークン |
-| `LINE_CHANNEL_SECRET` | 手順1-5のチャネルシークレット |
 | `GEMINI_API_KEY` | 手順2のAPIキー |
 | `SPREADSHEET_ID` | 手順3のスプレッドシートID |
 
@@ -64,17 +63,47 @@
 4. `資産マスタ` シートに自分の口座・資産を入力する(例: `〇〇銀行普通 / 現金預金 / 1 / TRUE`)
 5. `カテゴリ` シートのキーワード列を自分がよく使う店名で育てる(後からいつでも追記可)
 
-## 手順6: Webアプリのデプロイと Webhook 接続
+## 手順6: Webアプリと署名検証ゲートウェイのデプロイ
 
 1. GASエディタ右上「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」
    - 次のユーザーとして実行: **自分**
-   - アクセスできるユーザー: **全員**(LINEプラットフォームからの匿名POSTを受けるため。署名検証で保護される — 設計書8章)
-2. 発行された **ウェブアプリURL**(`https://script.google.com/macros/s/…/exec`)を控える
-3. LINE Developersコンソール →「Messaging API設定」→ Webhook URL に貼り付けて「検証」→ 成功を確認
-4. **Webhookの利用: オン** にする
+   - アクセスできるユーザー: **全員**(Workerからの匿名POSTを受けるため。共有鍵認証で保護される — 設計書8章)
+2. 発行された **ウェブアプリURL**(`https://script.google.com/macros/s/…/exec`)を控える。このURLはLINEへ直接設定しない
+3. Windowsのターミナルで次を実行し、64桁の共有鍵を生成する:
+
+   ```powershell
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+4. 生成値をGASのスクリプトプロパティ`GATEWAY_SHARED_SECRET`へ保存する。チャット、GitHub、スクリーンショットへ貼らない
+5. [Cloudflare](https://dash.cloudflare.com/sign-up)の無料アカウントを作成する。Workers Paidへの変更やカード登録は不要
+6. リポジトリの`gateway/`で以下を実行する（PowerShellでは`npm.cmd` / `npx.cmd`を使用）:
+
+   ```powershell
+   npm.cmd install
+   npx.cmd wrangler login
+   npx.cmd wrangler secret put LINE_CHANNEL_SECRET
+   npx.cmd wrangler secret put GAS_WEB_APP_URL
+   npx.cmd wrangler secret put GATEWAY_SHARED_SECRET
+   npx.cmd wrangler deploy
+   ```
+
+   - `LINE_CHANNEL_SECRET`: LINE Developersの「チャネル基本設定」にある値
+   - `GAS_WEB_APP_URL`: 手順6-2で控えた`/exec` URL
+   - `GATEWAY_SHARED_SECRET`: 手順6-3で生成し、GASへ設定したものと同じ値
+   - 各値はCloudflareの暗号化Secretに保存され、ソースコードや`wrangler.jsonc`には書かれない
+
+7. デプロイ結果の `https://assets-management-line-gateway.<サブドメイン>.workers.dev` URLを控える
+8. LINE Developersコンソール →「Messaging API設定」→ Webhook URL にWorker URLを貼り付けて「検証」→ 成功を確認
+9. **Webhookの利用: オン** にする
+10. GASに残っている`LINE_CHANNEL_SECRET`スクリプトプロパティは削除する（Workerだけが保持する）
+
+WorkerはWebhook本文（画像本体ではなくメッセージID等）をメモリ上で署名検証してGASへ転送するだけで、保存領域は使用しない。画像本体は従来どおりGASがLINEから直接取得する。
 
 > コード更新時の注意: GASは「デプロイを管理」→ 既存デプロイの「編集」→ バージョン「新バージョン」で更新する。
 > 「新しいデプロイ」を作るとURLが変わり、Webhook URLの再設定が必要になる。
+
+> 移行時の注意: GASをゲートウェイ対応版へ更新してから、LINEのWebhook URLをWorkerへ切り替える。この間はBotが一時的に応答しない。問題があれば、GASを直前のバージョンへ戻してからWebhook URLを旧GAS URLへ戻す。
 
 ## 手順7: 動作確認
 
@@ -90,8 +119,9 @@
 ## 手順8: 家族を追加する場合(任意)
 
 1. 手順1-7のQRコードを家族に共有して友だち追加してもらう
-2. 家族がBotに何かメッセージを送ると、`設定`シートの配信先ユーザーIDに自動追記される
-3. 想定外のユーザーが追加された場合は、`設定`シートから該当IDの行を削除する(削除されたIDのメッセージは無視される)
+2. 家族がBotを友だち追加すると、`設定`シートの配信先ユーザーIDに自動追記される
+3. 自動登録は先着2人で停止する。2人のIDが登録されたことを確認し、BotのQRコードや検索情報を公開しない
+4. 想定外のユーザーが先に登録された場合は、`設定`シートから該当IDの行を削除し、正しい家族に追加してもらう
 
 ## 手順9: 無料運用の上限と注意点
 
@@ -125,6 +155,14 @@
 
 参考: [LINE Messaging API料金とカウント方法](https://developers.line.biz/en/docs/messaging-api/pricing/)
 
+### Cloudflare Workers（署名検証ゲートウェイ）
+
+- Workers Freeは1日100,000リクエストまで無料。このBotではLINE Webhook 1回につきWorker 1リクエストで、2人利用なら十分な余裕がある
+- Paidプランへ変更しない。Free上限に達した場合はゲートウェイが一時停止し、追加課金ではなくBotが応答しなくなる
+- Workerは画像本体を取得・保存しない。署名検証後、WebhookのJSONだけをGASへ転送する
+
+参考: [Cloudflare Workers料金](https://developers.cloudflare.com/workers/platform/pricing/) / [Workers Free上限](https://developers.cloudflare.com/workers/platform/limits/)
+
 ### Google Apps Script
 
 - 個人向けGoogleアカウントのURL Fetch上限は1日20,000回（Google Workspaceは1日100,000回）
@@ -144,7 +182,9 @@
 
 | 症状 | 確認ポイント |
 |------|-------------|
-| Webhook検証が失敗する | デプロイの「アクセスできるユーザー」が「全員」か。URLが `/exec` で終わっているか |
+| Webhook検証が失敗する | LINEのWebhook URLがGASではなく`workers.dev`のWorker URLになっているか |
+| WorkerのWebhook検証が401になる | Workerの`LINE_CHANNEL_SECRET`がLINEチャネルの現在値と一致するか |
+| WorkerからGASへ届かない | GASとWorkerの`GATEWAY_SHARED_SECRET`が完全一致するか。`GAS_WEB_APP_URL`が既存デプロイの`/exec` URLか |
 | Botが無反応 | GASエディタの「実行数」ログでエラー確認。スクリプトプロパティ4つの綴り。LINE側「応答メッセージ」がオフか |
 | コード更新が反映されない | 「新バージョン」でデプロイし直したか(上記注意参照) |
 | レシート解析がエラーになる | `GEMINI_API_KEY` の値。無料枠のレート制限(数分おいて再試行) |
