@@ -36,7 +36,7 @@
   - `events` 配列をループし、イベント種別で分岐: `message`(text/image) / `follow`
   - `follow` イベント: ユーザーIDを`設定`シートの配信先に自動追記し、あいさつ+ヘルプを返信
   - 未知のイベント・未対応メッセージ種別は無視して200
-- `line.gs`: `replyMessage(replyToken, texts)`, `pushMessage(userId, texts)`, `getMessageContent(messageId)`(画像取得)、署名検証
+- `line.gs`: `replyMessage(replyToken, texts)`, `pushMessage(userId, texts)`, `getMessageContent(messageId)`(画像取得には専用ホスト `api-data.line.me` を使用)、署名検証
 - この時点では、テキストが来たら同じ内容をエコー返信する仮実装でよい
 
 **受け入れ条件**: LINE Developersコンソールの「検証」が成功する。Botにテキストを送るとエコーが返る。友だち追加でユーザーIDが`設定`シートに記録される。
