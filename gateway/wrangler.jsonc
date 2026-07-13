@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "assets-management-line-gateway",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-13",
+  "workers_dev": true,
+  "secrets": {
+    "required": [
+      "LINE_CHANNEL_SECRET",
+      "GAS_WEB_APP_URL",
+      "GATEWAY_SHARED_SECRET"
+    ]
+  }
+}
