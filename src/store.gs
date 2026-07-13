@@ -18,6 +18,7 @@ const SHEET_NAMES = Object.freeze({
   ASSET_MASTER: '資産マスタ',
   CATEGORIES: 'カテゴリ',
   SETTINGS: '設定',
+  DASHBOARD: 'ダッシュボード',
 });
 
 const SHEET_HEADERS = Object.freeze({
@@ -156,4 +157,37 @@ function getSheet_(sheetName) {
     throw new Error('Required sheet is missing: ' + sheetName + '. Run setup() first.');
   }
   return sheet;
+}
+
+/** Returns a required script property. */
+function getScriptProperty_(key) {
+  const value = PropertiesService.getScriptProperties().getProperty(key);
+  if (!value) {
+    throw new Error('Script property is not configured: ' + key);
+  }
+  return value;
+}
+
+/** Returns all populated data rows below a sheet header. */
+function getDataRows_(sheetName) {
+  const sheet = getSheet_(sheetName);
+  const lastRow = sheet.getLastRow();
+  const headers = SHEET_HEADERS[sheetName];
+  if (lastRow <= 1) return [];
+  return sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+}
+
+function formatYen_(amount) {
+  return Math.round(Number(amount) || 0).toLocaleString('ja-JP') + '円';
+}
+
+function formatYearMonth_(date) {
+  return Utilities.formatDate(date, APP_TIME_ZONE, 'yyyy-MM');
+}
+
+function getSettingValues_(key) {
+  return getDataRows_(SHEET_NAMES.SETTINGS)
+    .filter(function (row) { return String(row[SETTING_COLUMNS.KEY - 1]) === key; })
+    .map(function (row) { return row[SETTING_COLUMNS.VALUE - 1]; })
+    .filter(function (value) { return value !== '' && value !== null; });
 }
