@@ -75,7 +75,7 @@
 - `state.gs`: `CacheService.getUserCache()` ではなくスクリプトキャッシュ+ユーザーIDキーで実装(`state:<userId>`、TTL 30分、値はJSON)
 - 画像メッセージ受信時:
   1. `getMessageContent` で画像取得
-  2. Gemini API呼び出し: モデルは `gemini-2.5-flash`(呼び出し失敗時は1回だけリトライ)。`responseMimeType: "application/json"` とレスポンススキーマで設計書5.2のJSONを強制。プロンプトは設計書5.3の方針(税込支払額、割引・預り金の注意、検算、カテゴリ一覧の埋め込み)を全て含める
+  2. Gemini API呼び出し: モデルは `gemini-3.5-flash`(呼び出し失敗時は1回だけリトライ)。`responseMimeType: "application/json"` とレスポンススキーマで設計書5.2のJSONを強制。プロンプトは設計書5.3の方針(税込支払額、割引・預り金の注意、検算、カテゴリ一覧の埋め込み)を全て含める
   3. 解析結果を保留として状態保存し、確認メッセージを返信。`confidence: low` なら ⚠️+warning を付ける
 - 確認待ち状態でのルーティング:
   - `OK`(`ok` `おけ` も許容)→ 確定登録(入力方法=`receipt`、日付はレシート日付、nullなら当日)
