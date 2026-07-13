@@ -1,4 +1,5 @@
 const LINE_API_BASE = 'https://api.line.me/v2/bot';
+const LINE_DATA_API_BASE = 'https://api-data.line.me/v2/bot';
 
 function replyMessage(replyToken, texts) {
   if (!replyToken) return;
@@ -16,7 +17,7 @@ function pushMessage(userId, texts) {
 }
 
 function getMessageContent(messageId) {
-  const response = UrlFetchApp.fetch(LINE_API_BASE + '/message/' + encodeURIComponent(messageId) + '/content', {
+  const response = UrlFetchApp.fetch(LINE_DATA_API_BASE + '/message/' + encodeURIComponent(messageId) + '/content', {
     method: 'get',
     headers: { Authorization: 'Bearer ' + getScriptProperty_(SCRIPT_PROPERTY_KEYS.LINE_CHANNEL_ACCESS_TOKEN) },
     muteHttpExceptions: true,
