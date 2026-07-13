@@ -5,7 +5,7 @@ LINEに「ランチ 850」と送る、またはレシート写真を送るだけ
 
 ## 構成
 
-LINE Messaging API + Google Apps Script + Googleスプレッドシート + Gemini API(レシート解析)。
+LINE Messaging API + Cloudflare Workers(署名検証) + Google Apps Script + Googleスプレッドシート + Gemini API(レシート解析)。
 すべて無料枠内で動作し、口座連携は行わない(資産は月次の手動スナップショット方式)。
 
 ## ドキュメント
