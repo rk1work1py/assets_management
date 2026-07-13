@@ -19,18 +19,22 @@ function analyzeReceiptWithGemini_(blob, categories) {
     '小計+税=合計を検算し、不一致または不鮮明な場合はconfidenceをlowにしwarningに理由を書く。' +
     'カテゴリは次から1つ: ' + categories.join(', ');
   const schema = { type: 'OBJECT', properties: {
-    store: { type: 'STRING', nullable: true }, date: { type: 'STRING', nullable: true },
+    store: { type: 'STRING' }, date: { type: 'STRING', format: 'date' },
     total: { type: 'INTEGER' }, category: { type: 'STRING', enum: categories },
-    confidence: { type: 'STRING', enum: ['high', 'low'] }, warning: { type: 'STRING', nullable: true },
+    confidence: { type: 'STRING', enum: ['high', 'low'] }, warning: { type: 'STRING' },
   }, required: ['total', 'category', 'confidence'] };
   const payload = { contents: [{ parts: [
     { text: prompt }, { inlineData: { mimeType: blob.getContentType() || 'image/jpeg', data: Utilities.base64Encode(blob.getBytes()) } },
   ] }], generationConfig: { responseMimeType: 'application/json', responseSchema: schema } };
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(apiKey);
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
   let lastError;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true });
+      const response = UrlFetchApp.fetch(url, {
+        method: 'post', contentType: 'application/json',
+        headers: { 'x-goog-api-key': apiKey },
+        payload: JSON.stringify(payload), muteHttpExceptions: true,
+      });
       assertHttpSuccess_(response, 'Gemini API');
       const body = JSON.parse(response.getContentText());
       const text = body.candidates[0].content.parts.map(function (part) { return part.text || ''; }).join('');
@@ -38,6 +42,22 @@ function analyzeReceiptWithGemini_(blob, categories) {
     } catch (error) { lastError = error; if (attempt === 0) Utilities.sleep(500); }
   }
   throw lastError;
+}
+
+/** Run manually from the Apps Script editor to verify the Gemini API key. */
+function testGeminiConnection() {
+  const apiKey = getScriptProperty_(SCRIPT_PROPERTY_KEYS.GEMINI_API_KEY);
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
+  const response = UrlFetchApp.fetch(url, {
+    method: 'post', contentType: 'application/json',
+    headers: { 'x-goog-api-key': apiKey },
+    payload: JSON.stringify({ contents: [{ parts: [{ text: 'Reply with OK.' }] }] }),
+    muteHttpExceptions: true,
+  });
+  const result = { status: response.getResponseCode(), body: response.getContentText().slice(0, 1000) };
+  console.log(JSON.stringify(result));
+  if (result.status < 200 || result.status >= 300) throw new Error('Gemini connection test failed (' + result.status + '): ' + result.body);
+  return result;
 }
 
 function validateReceiptResult_(result, categories) {
