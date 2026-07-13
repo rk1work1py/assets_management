@@ -23,10 +23,38 @@ function setup() {
 
   seedDefaultCategories_();
   seedDefaultSettings_();
+  ensureDashboard_(spreadsheet);
   result.createdTrigger = ensureDailyReportTrigger_();
 
   console.log(JSON.stringify(result));
   return result;
+}
+
+/** Creates a formula-driven dashboard without overwriting an existing one. */
+function ensureDashboard_(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName(SHEET_NAMES.DASHBOARD);
+  if (!sheet) sheet = spreadsheet.insertSheet(SHEET_NAMES.DASHBOARD);
+  if (sheet.getLastRow() > 0 || sheet.getLastColumn() > 0) return;
+
+  sheet.getRange('A1').setValue('月別支出合計（直近12ヶ月）');
+  sheet.getRange('A2').setFormula(
+    '=QUERY({TEXT(\'' + SHEET_NAMES.EXPENSES + '\'!B2:B,"yyyy-mm"),\'' +
+      SHEET_NAMES.EXPENSES + '\'!C2:C,\'' + SHEET_NAMES.EXPENSES +
+      '\'!I2:I},"select Col1,sum(Col2) where Col1 is not null and Col3=\'' +
+      EXPENSE_STATUS.CONFIRMED + '\' group by Col1 order by Col1 desc limit 12 label sum(Col2) \'支出合計\'",0)'
+  );
+  sheet.getRange('D1').setValue('当月カテゴリ別支出');
+  sheet.getRange('D2').setFormula(
+    '=QUERY(\'' + SHEET_NAMES.EXPENSES + '\'!B2:I,"select D,sum(C) where B >= date \'"&' +
+      'TEXT(EOMONTH(TODAY(),-1)+1,"yyyy-mm-dd")&"\' and B <= date \'"&' +
+      'TEXT(EOMONTH(TODAY(),0),"yyyy-mm-dd")&"\' and I=\'' + EXPENSE_STATUS.CONFIRMED +
+      '\' group by D order by sum(C) desc label sum(C) \'金額\'",0)'
+  );
+  sheet.getRange('G1').setValue('資産種別×年月');
+  sheet.getRange('G2').setFormula(
+    '=QUERY(\'' + SHEET_NAMES.ASSET_SNAPSHOTS + '\'!A2:D,"select A,sum(D) where A is not null group by A pivot C label sum(D) \'評価額\'",0)'
+  );
+  sheet.setFrozenRows(1);
 }
 
 /**
