@@ -29,6 +29,7 @@ function buildSafeErrorMessage_(error) {
   if (message.indexOf('GEMINI_API_KEY') >= 0) return '⚠️ Gemini APIキーが設定されていません。';
   if (/Gemini API failed \(400\)/.test(message)) return '⚠️ Gemini APIのリクエストエラー（400）です。';
   if (/Gemini API failed \(403\)/.test(message)) return '⚠️ Gemini APIキーの権限エラー（403）です。';
+  if (/Gemini API failed \(404\)/.test(message)) return '⚠️ 指定したGeminiモデルを利用できません（404）。';
   if (/Gemini API failed \(429\)/.test(message)) return '⚠️ Gemini APIの利用上限（429）です。少し待って再試行してください。';
   if (message.indexOf('LINE content API') >= 0) return '⚠️ LINEから画像を取得できませんでした。';
   return 'エラーが発生しました。もう一度試してください。';
