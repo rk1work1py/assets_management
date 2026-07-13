@@ -15,6 +15,7 @@ LINE Messaging API + Cloudflare Workers(署名検証) + Google Apps Script + Goo
 | [docs/01_design.md](docs/01_design.md) | 設計書 — 要件、システム構成、データモデル、対話仕様、レシート解析仕様 |
 | [docs/02_setup_guide.md](docs/02_setup_guide.md) | 構築手順書 — LINE公式アカウント作成からWebhook接続までの手作業手順 |
 | [docs/03_implementation_plan.md](docs/03_implementation_plan.md) | 実装指示書 — フェーズ別の実装タスクと受け入れ条件 |
+| [docs/04_system_overview.md](docs/04_system_overview.md) | システム全体解説 — Cloudflareを含む仕組み、データフロー、セキュリティ、運用 |
 
 ## 主な機能
 
