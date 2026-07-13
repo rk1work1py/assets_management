@@ -51,19 +51,3 @@ function assertHttpSuccess_(response, label) {
     throw new Error(label + ' failed (' + code + '): ' + response.getContentText());
   }
 }
-
-function getLineSignature_(e) {
-  const headers = e && e.headers ? e.headers : {};
-  return headers['x-line-signature'] || headers['X-Line-Signature'] || null;
-}
-
-function verifyLineSignature_(rawBody, signature) {
-  if (!signature) return null;
-  const secret = getScriptProperty_(SCRIPT_PROPERTY_KEYS.LINE_CHANNEL_SECRET);
-  const bytes = Utilities.computeHmacSha256Signature(rawBody, secret, Utilities.Charset.UTF_8);
-  const expected = Utilities.base64Encode(bytes);
-  if (expected.length !== signature.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < expected.length; i += 1) mismatch |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
-  return mismatch === 0;
-}
