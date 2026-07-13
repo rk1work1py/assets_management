@@ -93,6 +93,53 @@
 2. 家族がBotに何かメッセージを送ると、`設定`シートの配信先ユーザーIDに自動追記される
 3. 想定外のユーザーが追加された場合は、`設定`シートから該当IDの行を削除する(削除されたIDのメッセージは無視される)
 
+## 手順9: 無料運用の上限と注意点
+
+以下は2026年7月13日時点。各社の上限・料金は変更されることがあるため、リンク先の最新表示を優先する。
+
+### Gemini API（レシート解析）
+
+- `gemini-3.5-flash` のStandard APIはFree Tierで入力・出力トークンとも無料。ただしFree Tierでは、送信したレシート画像や出力がGoogleのサービス改善に使われる可能性がある
+- 無料枠の正確なRPM（1分あたり）、TPM（トークン/分）、RPD（リクエスト/日）はプロジェクトやアカウント状態で変わる。固定値を手順書に書かず、[Google AI StudioのActive rate limits](https://aistudio.google.com/rate-limit)で `gemini-3.5-flash` の現在値を確認する
+- このBotでは、レシート1枚につき通常1リクエスト。Gemini呼び出しが失敗した場合は1回だけ再試行するため、失敗時は最大2リクエストになる。テキスト支出登録・集計・資産登録ではGeminiを使わない。`testGeminiConnection()`の実行は1リクエスト
+- 1日のレシート上限の目安は通常 `RPD` 枚。すべて再試行になった場合の安全側の目安は `RPD ÷ 2` 枚。RPDは米国太平洋時間の午前0時にリセットされる
+- 独立した「月間リクエスト数」の固定枠は案内されていないため、理論上の月間目安は `RPD × その月の日数`。ただし実際にはRPM・TPMにも同時に制限され、上限値自体も変更されうる
+- 上限に達すると課金へ自動移行するのではなく、Free Tierのままなら通常は `429 RESOURCE_EXHAUSTED` で停止する。連続再送せず、時間を置くか日次リセットを待つ
+
+**意図しない課金を確実に避ける設定:**
+
+1. このBot専用のGoogle AI Studioプロジェクトを使う
+2. [Google AI Studio](https://aistudio.google.com/)でUsage Tierが **Free** であることを確認する
+3. そのプロジェクトに請求先アカウントをリンクしない。カード登録やPaid Tierへのアップグレードを行わない
+4. 将来Paid Tierを使う場合、Google Cloudの予算アラートは通知であり、利用額を自動停止するハード上限ではないことに注意する
+
+参考: [Gemini料金](https://ai.google.dev/gemini-api/docs/pricing) / [Geminiレート制限](https://ai.google.dev/gemini-api/docs/rate-limits) / [Gemini請求](https://ai.google.dev/gemini-api/docs/billing)
+
+### LINE Messaging API
+
+- 日本のコミュニケーションプラン（無料）は、カウント対象メッセージが月200通まで
+- このBotがユーザー操作へ返す**返信メッセージはカウント対象外**。テキスト登録、レシート解析結果、`今月`などを通常利用しても200通を消費しない
+- 月次レポートはプッシュメッセージなのでカウント対象。現在の設計では `配信先ユーザー数 × 月1通`。家族4人なら月4通が目安
+- LINE Official Account Managerからの一斉配信や、将来追加するプッシュ通知も同じ月間枠を消費する。上限到達後は追加課金されず送信エラーになるプランだが、有料プランへ変更しないこと
+- 知らないユーザーIDが`設定`シートの配信先に入っていないか定期的に確認する
+
+参考: [LINE Messaging API料金とカウント方法](https://developers.line.biz/en/docs/messaging-api/pricing/)
+
+### Google Apps Script
+
+- 個人向けGoogleアカウントのURL Fetch上限は1日20,000回（Google Workspaceは1日100,000回）
+- レシート1枚は通常、LINE画像取得・Gemini解析・LINE返信の約3回。Gemini再試行時は約4回。Apps Scriptだけを基準にすると約5,000枚/日以上だが、実際には先にGeminiのRPD/RPM制限へ達する可能性が高い
+- URL Fetch上限は課金ではなく実行停止の制限。失敗状況はApps Scriptの「実行数」で確認する
+
+参考: [Apps Scriptの割り当て](https://developers.google.com/apps-script/guides/services/quotas)
+
+### 日常利用での注意
+
+- レシートは1枚ずつ、文字が読める明るさ・角度で撮る。同じ画像を何度も連続送信しない
+- レシートに氏名、住所、会員番号、カード情報など不要な個人情報が写る場合は、撮影前に隠すか画像を切り取る
+- APIキー、LINEチャネルアクセストークン、チャネルシークレットはLINE・GitHub・スクリーンショットへ貼らない。漏えいした場合は直ちに再発行する
+- 無料枠の確認先は、GeminiはGoogle AI Studio、LINEはLINE Official Account Manager、Apps Scriptは「実行数」。月初に一度確認すると安全
+
 ## トラブルシューティング
 
 | 症状 | 確認ポイント |
