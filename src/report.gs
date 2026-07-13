@@ -57,7 +57,7 @@ function runMonthlyReport() {
   if (!hasAssetSnapshotForMonth_(formatYearMonth_(today))) {
     message += '\n\n💰「資産」と送って今月の残高を登録してください。';
   }
-  const userIds = Array.from(new Set(getSettingValues_(SETTING_KEYS.DELIVERY_USER_ID).map(String)));
+  const userIds = getAllowedUserIds_();
   userIds.forEach(function (userId) {
     try { pushMessage(userId, message); } catch (error) { console.error('Monthly push failed for ' + userId + ': ' + error.stack); }
   });
